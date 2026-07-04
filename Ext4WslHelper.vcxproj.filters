@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="common">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="command">
+      <UniqueIdentifier>{b2c3d4e5-f6a7-8901-bcde-f12345678901}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core">
+      <UniqueIdentifier>{c3d4e5f6-a7b8-9012-cdef-123456789012}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ui">
+      <UniqueIdentifier>{e5f6a7b8-c9d0-1234-efab-345678901234}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\common\Logger.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="src\common\Utils.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="src\command\PowershellExecutor.cpp">
+      <Filter>command</Filter>
+    </ClCompile>
+    <ClCompile Include="src\command\WslExecutor.cpp">
+      <Filter>command</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\UsbipdManager.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\WslManager.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\DeviceManager.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\MountManager.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\MainWindow.cpp">
+      <Filter>ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\PasswordDialog.cpp">
+      <Filter>ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\command\CommandWindow.cpp" />
+    <ClCompile Include="src\ui\DebugTestWindow.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\common\Error.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\common\Logger.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\common\Utils.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\MainWindow.h">
+      <Filter>ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\PasswordDialog.h">
+      <Filter>ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\command\ICommandExecutor.h">
+      <Filter>command</Filter>
+    </ClInclude>
+    <ClInclude Include="src\command\PowershellExecutor.h">
+      <Filter>command</Filter>
+    </ClInclude>
+    <ClInclude Include="src\command\WslExecutor.h">
+      <Filter>command</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\UsbipdManager.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\WslManager.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\DeviceManager.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\MountManager.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\DebugTestWindow.h" />
+    <ClInclude Include="src\command\CommandEchoDecorator.h" />
+    <ClInclude Include="src\command\CommandWindow.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="resources\app.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resources\app.rc" />
+  </ItemGroup>
+</Project>

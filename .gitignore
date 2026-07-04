@@ -1,0 +1,36 @@
+# Build outputs
+x64/
+*.obj
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.ipch
+*.tlog
+*.log
+*.exe
+*.dll
+*.manifest
+!resources/app.manifest
+*.embed.manifest
+*.embed.manifest.res
+*.res
+*.ipdb
+*.iobj
+*.recipe
+
+# VS user files
+*.suo
+*.user
+*.vs/
+.vs/
+
+# Build tools
+.vcpkg/
+vcpkg_installed/
+
+# Windows
+Thumbs.db
+
+# claude
+.claude/settings.local.json
