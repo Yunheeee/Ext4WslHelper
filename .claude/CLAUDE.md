@@ -41,6 +41,8 @@ x64\Release\Ext4WslHelper.Tests.exe --gtest_filter=*TestName*
 
 ```
 Ext4WslHelper/
+├── .github/workflows/       # CI/CD — 编译 & 发布 Release
+│   └── build-release.yml    #   tag 推送触发 / workflow_dispatch 手动触发
 ├── src/
 │   ├── ui/                   # Win32 GUI 层 — 窗口、控件、对话框
 │   │   ├── MainWindow/       # 主窗口
@@ -64,7 +66,7 @@ Ext4WslHelper/
 │       ├── Logger/           # 日志模块
 │       ├── Utils/            # 字符串、编码转换、RunProcess 工具
 │       ├── Error/            # 统一错误码/异常处理
-│       └── WslSetup/         # WSL 环境离线安装（系统版本检查、MSI/Appx安装）
+│       └── WslSetup/         # WSL 环境离线安装（系统版本检查、MSI/Tar导入）
 ├── tests/
 │   ├── UsbipdManagerTests.cpp
 │   ├── WslManagerTests.cpp
@@ -75,11 +77,16 @@ Ext4WslHelper/
 │   ├── UtilsTests.cpp
 │   ├── MockCommandExecutor.h
 │   └── IntegrationTests.cpp
+├── scripts/
+│   └── gen-version.ps1       # 编译前生成版本头文件（从 VERSION 文件读取）
 ├── resources/
 │   ├── app.manifest          # 应用程序清单
-│   └── app.rc                # 图标/版本资源
+│   └── app.rc                # 图标/版本资源（版本号由 version.h 宏注入）
 ├── docs/                     # 设计文档
-├── Ext4WslHelper.sln         # VS2022 解决方案文件
+├── VERSION                   # 版本号唯一来源（纯文本，如 0.0.0）
+├── packages.yaml             # 离线安装包下载地址（供 CI 构建时下载）
+├── README.md                 # 项目说明
+└── Ext4WslHelper.sln         # VS2022 解决方案文件
 ```
 
 ### 分层依赖规则
@@ -126,6 +133,41 @@ public:
 - `WslExecutor` 类似，管理 `wsl.exe -d <distro>` 长驻进程，bash 风格标记协议
 - `CommandEchoDecorator` 包装 `ICommandExecutor`，在命令执行前通过 `Logger` 记录标签和命令行（仅日志，无控制台回显）
 - 上层代码只依赖 `ICommandExecutor`，运行时通过工厂或 DI 注入具体实现
+
+### 版本号管理
+
+```
+VERSION (纯文本)  ──▶  scripts/gen-version.ps1  ──▶  src/common/version.h  ──▶  resources/app.rc  ──▶  exe
+      0.0.0             编译前自动执行                   生成宏 (不跟踪)              #include version.h       嵌入版本资源
+```
+
+- `VERSION` 文件是版本号的**唯一来源**，修改它即修改所有引用处
+- `gen-version.ps1` 在每次 `msbuild` 编译前自动运行（vcxproj 的 `GenerateVersionHeader` target，`BeforeTargets="ResourceCompile"`）
+- 生成的 `src/common/version.h` 包含 `VERSION_COMMA`（PE 四位整数）和 `VERSION_STRING`（字符串），不被 git 跟踪
+- `app.rc` 通过 `#include "../src/common/version.h"` 获取版本宏，替代硬编码
+
+### CI/CD
+
+`.github/workflows/build-release.yml`：
+
+| 触发方式 | 行为 |
+|---|---|
+| `git tag vX.Y.Z` + push | 自动编译 → 下载离线包 → 打包 `Ext4WslHelper-vX.Y.Z.zip` → 发布 GitHub Release |
+| GitHub Actions 页面手动触发 | 编译 → 下载离线包 → 打包 zip（版本号取 VERSION 文件或手动填写） |
+
+手动触发时可输入 `version` 参数覆盖 VERSION 文件。tag 触发时自动从 `v` 前缀提取版本号。zip 包内结构：
+
+```
+Ext4WslHelper-v1.0.0.zip
+├── Ext4WslHelper.exe
+├── README.md
+└── packages/
+    ├── wsl_update_x64.msi
+    ├── Alpine.zip
+    └── usbipd-win_5.3.0_x64.msi
+```
+
+离线包下载地址定义在 `packages.yaml` 中。
 
 ### 关键技术栈
 

@@ -1,0 +1,12 @@
+# 离线安装包下载地址
+# 每个包需要 name 和 url，url 指向可公开下载的 .msi / .tar / .zip 文件
+
+packages:
+  - name: wsl_update_x64.msi
+    url: https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi
+
+  - name: Alpine.zip
+    url: https://github.com/yuk7/AlpineWSL/releases/download/3.23.3-0/Alpine.zip
+
+  - name: usbipd-win_5.3.0_x64.msi
+    url: https://github.com/dorssel/usbipd-win/releases/download/v5.3.0/usbipd-win_5.3.0_x64.msi

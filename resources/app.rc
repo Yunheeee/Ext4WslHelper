@@ -1,12 +1,13 @@
 #include "../src/ui/Resource.h"
+#include "../src/common/version.h"
 
 // 应用程序清单
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "app.manifest"
 
 // 版本信息
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     1,0,0,0
-PRODUCTVERSION  1,0,0,0
+FILEVERSION     VERSION_COMMA
+PRODUCTVERSION  VERSION_COMMA
 FILEFLAGSMASK   0x3fL
 #ifdef _DEBUG
 FILEFLAGS       VS_FF_DEBUG
@@ -23,12 +24,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      ""
             VALUE "FileDescription",  "Ext4WslHelper - EXT4 SD Card Access Tool"
-            VALUE "FileVersion",      "1.0.0.0"
+            VALUE "FileVersion",      VERSION_STRING
             VALUE "InternalName",     "Ext4WslHelper"
             VALUE "LegalCopyright",   ""
             VALUE "OriginalFilename", "Ext4WslHelper.exe"
             VALUE "ProductName",      "Ext4WslHelper"
-            VALUE "ProductVersion",   "1.0.0.0"
+            VALUE "ProductVersion",   VERSION_STRING
         END
     END
     BLOCK "VarFileInfo"
