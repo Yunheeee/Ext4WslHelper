@@ -7,7 +7,7 @@
 | 组件 | 用途 | 离线包格式 |
 |---|---|---|
 | Windows 可选功能（WSL + 虚拟机平台） | 基础虚拟化支持 | 系统内置（dism 启用） |
-| WSL2 内核 | WSL2 运行环境 | `wsl_update_x64.msi` |
+| WSL 安装包（含内核） | WSL ≥ 2.x，内核 ≥ 5.10.60.1 | `wsl.3.0.5.0.x64.msi` |
 | Alpine WSL 发行版 | EXT4 挂载操作环境 | `Alpine.tar` 或 `Alpine.zip`（自动解压） |
 | usbipd-win | USB 设备重定向到 WSL | `usbipd-win_*.msi` |
 
@@ -41,12 +41,12 @@
   │
   ├─ Step 3: 用户点击 [一键初始化] → 离线安装（后台线程）
   │      EnvInitThreadProc:
-  │        ├── FindPackageFile(exeDir, "wsl*.msi")
+  │        ├── FindWslPackage(exeDir)  // wsl.<version>.x64.msi，排除旧 wsl_update_x64.msi
   │        ├── FindPackageFile(exeDir, "alpine*.tar*") / "alpine*.zip"
   │        ├── FindPackageFile(exeDir, "usbipd*.msi")
   │        │
   │        ├── 安装 WSL 内核 MSI:
-  │        │    msiexec /i "wsl_update_x64.msi" /quiet /norestart
+  │        │    msiexec /i "wsl.3.0.5.0.x64.msi" /quiet /norestart
   │        │    wsl --set-default-version 2
   │        │
   │        ├── 导入 Alpine 发行版:
@@ -66,7 +66,7 @@
 
 | 操作 | 来源 | 目标 |
 |---|---|---|
-| wsl_update_x64.msi 安装 | exe 同目录 | 系统级别 |
+| wsl.3.0.5.0.x64.msi 安装 | exe 同目录 | 系统级别 |
 | Alpine.tar(.zip) 导入 | exe 同目录 → 解压（zip）→ `wsl --import` | `%LOCALAPPDATA%\Alpine` |
 | usbipd-win_*.msi 安装 | exe 同目录 | 系统级别 (`%PROGRAMFILES%\usbipd-win`) |
 
@@ -93,7 +93,7 @@ bool IsWindowsVersionSupported();
 // 检查 Windows 可选功能是否启用（如 VirtualMachinePlatform）
 bool IsWindowsFeatureEnabled(const std::wstring& featureName);
 
-// 安装 MSI 包（用于 wsl_update 和 usbipd-win）
+// 安装 MSI 包（用于 WSL 和 usbipd-win）
 bool InstallMsi(const std::wstring& msiPath, std::string* outError = nullptr);
 
 // 导入 Alpine tar 包为 WSL 发行版

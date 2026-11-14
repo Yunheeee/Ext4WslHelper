@@ -20,7 +20,7 @@ packages/ 目录下为所有依赖的安装包，可离线使用。
 | 文件 | 说明 |
 |------|------|
 | Ext4WslHelper.exe| 🚀 主程序 — 直接运行，自动处理所有依赖 |
-| packages/wsl_update_x64.msi |	WSL2 Linux 内核更新包（离线安装）|
+| packages/wsl.3.0.5.0.x64.msi |	WSL 3.0.5 安装包（内核 ≥ 5.10.60.1）|
 | packages/usbipd-win_5.3.0_x64.msi | USB/IP 工具，用于 WSL2 共享 USB 设备 |
 | packages/Alpine.zip |	Alpine Linux WSL 发行版（挂载环境）|
 

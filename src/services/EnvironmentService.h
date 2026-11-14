@@ -11,20 +11,31 @@ enum class CheckState {
     Ready            // 已就绪
 };
 
+// dism /get-featureinfo 报告的功能状态
+enum class DismFeatureState {
+    Unknown,
+    Disabled,
+    Enabled,
+    EnablePending,   // 已启用但等待重启（State: Enable Pending / 状态: 启用挂起）
+    DisablePending
+};
+
 // 虚拟化检查（VT-x/AMD-V 是否在固件中启用）
 struct VirtCheckResult {
     CheckState state = CheckState::Unknown;
     bool isEnabled = false;
+    bool needsReboot = false;   // 功能已启用，但组件需要重启后才生效
     std::string detail;
-    bool isReady() const { return isEnabled; }
+    bool isReady() const { return state == CheckState::Ready; }
 };
 
 // WSL Windows 功能检查
 struct WslFeatureCheckResult {
     CheckState state = CheckState::Unknown;
     bool isEnabled = false;
+    bool needsReboot = false;   // 功能已启用，但组件需要重启后才生效
     std::string detail;
-    bool isReady() const { return isEnabled; }
+    bool isReady() const { return state == CheckState::Ready; }
 };
 
 struct WslCheckResult {
@@ -80,6 +91,12 @@ public:
     explicit EnvironmentService(ICommandExecutor* executor);
     EnvironmentStatus CheckAll() override;
 
+    // 版本/输出解析（public static 便于单元测试）
+    static DismFeatureState ParseDismFeatureState(const std::string& dismOutput);
+    static bool IsWslVersionSupported(const std::string& version);
+    static bool IsKernelVersionSupported(const std::string& kernelVersion);
+    static bool LooksLikeWslHelpOutput(const std::string& output);
+
 private:
     VirtCheckResult      CheckVirtualization();
     WslFeatureCheckResult CheckWslFeature();
@@ -87,5 +104,9 @@ private:
     AlpineCheckResult    CheckAlpine();
     UsbipdCheckResult    CheckUsbipd();
 
+    // WSL 首次调用（VM 冷启动）可能远超 10s：首次 60s，后续 15s，并做一次超时重试
+    CommandResult RunWsl(const std::string& commandLine);
+
     ICommandExecutor* executor_;
+    bool wslWarmedUp_ = false;
 };

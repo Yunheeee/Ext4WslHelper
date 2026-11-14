@@ -240,12 +240,22 @@ LRESULT MainWindow::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
     }
 
     case WM_USER_ENV_INIT_COMPLETE: {
-        bool ok = (wParam != 0);
+        // 0=失败, 1=成功, 2=功能已启用但需要重启
+        bool ok = (wParam == 1);
+        bool needsReboot = (wParam == 2);
         EnableControls(true);
         isWorking_ = false;
         if (ok) {
             AppendLog(L"✓ 环境初始化完成");
             SetMountStatus(L"✓ 环境已就绪");
+        } else if (needsReboot) {
+            AppendLog(L"⚠ WSL 功能已启用，但组件需要重启 Windows 才能生效");
+            SetMountStatus(L"⚠ 需要重启 Windows 后重试", true);
+            MessageBoxW(hwnd_,
+                L"WSL 功能已启用，但相关组件需要重启 Windows 后才能生效。\n\n"
+                L"请重启计算机，然后重新运行 Ext4WslHelper 并再次点击「环境初始化」。",
+                L"需要重启 Windows",
+                MB_OK | MB_ICONWARNING);
         } else {
             AppendLog(L"✗ 环境初始化未完全成功，请检查日志");
             SetMountStatus(L"⚠ 环境初始化未完成", true);
@@ -811,22 +821,59 @@ void MainWindow::OnEnvCheckComplete(EnvironmentStatus* status) {
 
     // 更新 5 项状态指示灯
     // 仅有 ✓/✗ 前缀识别状态，红绿灯颜色通过 WM_CTLCOLORSTATIC 从首字符判断
+    bool anyNeedsReboot = false;
     for (int i = 0; i < 5; i++) {
         bool ready = false;
+        bool needsReboot = false;
+        const std::string* detail = nullptr;
         switch (i) {
-        case 0: ready = status->virt.isReady(); break;
-        case 1: ready = status->wslFeature.isReady(); break;
-        case 2: ready = status->wsl.isReady(); break;
-        case 3: ready = status->alpine.isReady(); break;
-        case 4: ready = status->usbipd.isReady(); break;
+        case 0:
+            ready = status->virt.isReady();
+            needsReboot = status->virt.needsReboot;
+            detail = &status->virt.detail;
+            break;
+        case 1:
+            ready = status->wslFeature.isReady();
+            needsReboot = status->wslFeature.needsReboot;
+            detail = &status->wslFeature.detail;
+            break;
+        case 2:
+            ready = status->wsl.isReady();
+            detail = &status->wsl.detail;
+            break;
+        case 3:
+            ready = status->alpine.isReady();
+            detail = &status->alpine.detail;
+            break;
+        case 4:
+            ready = status->usbipd.isReady();
+            detail = &status->usbipd.detail;
+            break;
         }
-        std::string label = (ready ? "✓ " : "✗ ") + utils::WStringToUtf8(s_labels[i]);
-        SetWindowTextW(envStatus_[i].text, utils::Utf8ToWString(label).c_str());
+        anyNeedsReboot = anyNeedsReboot || needsReboot;
+
+        std::wstring label;
+        if (ready) label = L"✓ ";
+        else if (needsReboot) label = L"⟳ ";
+        else label = L"✗ ";
+        label += s_labels[i];
+        if (needsReboot) label += L"（需重启）";
+
+        SetWindowTextW(envStatus_[i].text, label.c_str());
         InvalidateRect(envStatus_[i].icon, nullptr, TRUE);
+
+        if (!ready && detail && !detail->empty()) {
+            AppendLog((label + L": " + utils::Utf8ToWString(*detail)).c_str());
+        }
     }
 
     bool allReady = status->allReady();
-    SetMountStatus(allReady ? L"✓ 环境已就绪" : L"⚠ 部分环境未就绪");
+    if (anyNeedsReboot) {
+        SetMountStatus(L"⚠ 需要重启 Windows 后重试");
+        AppendLog(L"⚠ WSL 功能已启用，但组件需要重启 Windows 后才能生效，请重启后重新检测");
+    } else {
+        SetMountStatus(allReady ? L"✓ 环境已就绪" : L"⚠ 部分环境未就绪");
+    }
 
     if (allReady) {
         AppendLog(L"✓ 环境检测通过");
@@ -856,10 +903,11 @@ void MainWindow::OnEnvInit() {
     // 默认搜索路径改为 exe 同目录下的 packages\ 子目录
     std::wstring pkgDir = exeDir + L"\\packages";
 
-    // 查找各离线包
-    std::wstring wslMsi = wslsetup::FindPackageFile(pkgDir, L"wsl_update_x64.msi");
+    // 查找各离线包（新版 WSL 包名为 wsl.<version>.x64.msi；
+    // 旧版 wsl_update_x64.msi 内核 5.10.16，不满足 usbipd 要求，必须排除）
+    std::wstring wslMsi = wslsetup::FindWslPackage(pkgDir);
     if (wslMsi.empty())
-        wslMsi = wslsetup::FindPackageFile(pkgDir, L"*wsl*.msi");
+        wslMsi = wslsetup::FindWslPackage(exeDir);
 
     std::wstring alpinePkg = wslsetup::FindPackageFile(pkgDir, L"Alpine.zip");
     if (alpinePkg.empty())
@@ -875,8 +923,9 @@ void MainWindow::OnEnvInit() {
 
     // 提示缺失的离线包
     if (wslMsi.empty() || alpinePkg.empty() || usbipdMsi.empty()) {
-        std::wstring msg = L"未找到全部离线安装包，请先点击「选择安装包」指定路径。\n\n";
-        if (wslMsi.empty()) msg += L"  • WSL2 内核 MSI (wsl_update_x64.msi)\n";
+        std::wstring msg = L"未找到全部离线安装包，请把安装包放到程序目录的 packages 文件夹。\n\n";
+        if (wslMsi.empty()) msg += L"  • 新版 WSL 安装包 (wsl.<版本>.x64.msi，需 WSL ≥2.x / 内核 ≥5.10.60.1)\n"
+                                   L"    （旧版 wsl_update_x64.msi 内核 5.10.16 过旧，已不再支持）\n";
         if (alpinePkg.empty()) msg += L"  • Alpine 发行包 (Alpine.zip / alpine*.tar*)\n";
         if (usbipdMsi.empty()) msg += L"  • usbipd-win MSI (usbipd*.msi)\n";
         msg += L"\n已自动查找目录: ";
@@ -920,6 +969,28 @@ DWORD WINAPI MainWindow::EnvInitThreadProc(LPVOID param) {
     EnvironmentStatus status = p->wnd->envService_.CheckAll();
 
     bool allOk = true;
+    bool rebootRequired = false;
+
+    // 启用功能后再次查询 dism，识别 "Enable Pending / 启用挂起"。
+    // 这是“已写入标志位但组件未生效”的最直接证据。
+    auto featurePendingReboot = [](const wchar_t* featureName) -> bool {
+        std::wstring args = L"/online /get-featureinfo /featurename:";
+        args += featureName;
+        auto info = utils::RunProcess(L"dism.exe", args, "", 30000);
+        return EnvironmentService::ParseDismFeatureState(info.stdOut) ==
+               DismFeatureState::EnablePending;
+    };
+
+    // 功能标志位已写入但组件未落地：继续安装/导入只会得到 1603 或挂载失败，
+    // 直接引导用户重启。
+    if (status.wslFeature.needsReboot || status.virt.needsReboot) {
+        postLog((L"⚠ " + utils::Utf8ToWString(
+            status.wslFeature.needsReboot ? status.wslFeature.detail : status.virt.detail)).c_str());
+        postLog(L"⚠ WSL/VirtualMachinePlatform 已启用但组件尚未生效，请重启 Windows 后重试");
+        PostMessageW(hwnd, WM_USER_ENV_INIT_COMPLETE, 2, 0);
+        delete p;
+        return 0;
+    }
 
     // Step 0: 启用 Windows 功能（WSL 子系统 + 虚拟化平台）
     // 需要管理员权限，dism /enable-feature 才能执行
@@ -928,10 +999,16 @@ DWORD WINAPI MainWindow::EnvInitThreadProc(LPVOID param) {
         auto r = utils::RunProcess(L"dism.exe",
             L"/online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart",
             "", 120000);
-        // 3010 = 需要重启，也算成功
+        // 3010 = 需要重启，也算成功；即使 exit=0，也要确认组件已落地
         if (r.exitCode == 0 || r.exitCode == 3010) {
-            std::wstring note = (r.exitCode == 3010) ? L"（需要重启生效）" : L"";
-            postLog((L"✓ WSL 子系统功能已启用" + note).c_str());
+            if (r.exitCode == 3010 ||
+                featurePendingReboot(L"Microsoft-Windows-Subsystem-Linux") ||
+                !wslsetup::IsWslComponentInstalled()) {
+                rebootRequired = true;
+                postLog(L"⟳ WSL 子系统功能已启用，需要重启 Windows 后组件才会生效");
+            } else {
+                postLog(L"✓ WSL 子系统功能已启用");
+            }
         } else {
             postLog((L"✗ 启用 WSL 子系统失败（请以管理员身份运行）: " +
                      utils::Utf8ToWString(r.stdOut)).c_str());
@@ -947,8 +1024,14 @@ DWORD WINAPI MainWindow::EnvInitThreadProc(LPVOID param) {
             L"/online /enable-feature /featurename:VirtualMachinePlatform /all /norestart",
             "", 120000);
         if (r.exitCode == 0 || r.exitCode == 3010) {
-            std::wstring note = (r.exitCode == 3010) ? L"（需要重启生效）" : L"";
-            postLog((L"✓ 虚拟化平台功能已启用" + note).c_str());
+            if (r.exitCode == 3010 ||
+                featurePendingReboot(L"VirtualMachinePlatform") ||
+                !wslsetup::IsVirtualMachinePlatformComponentInstalled()) {
+                rebootRequired = true;
+                postLog(L"⟳ 虚拟化平台功能已启用，需要重启 Windows 后组件才会生效");
+            } else {
+                postLog(L"✓ 虚拟化平台功能已启用");
+            }
         } else {
             postLog((L"✗ 启用虚拟化平台失败（请以管理员身份运行）: " +
                      utils::Utf8ToWString(r.stdOut)).c_str());
@@ -958,19 +1041,42 @@ DWORD WINAPI MainWindow::EnvInitThreadProc(LPVOID param) {
         postLog(L"✓ 虚拟化平台已就绪，跳过");
     }
 
-    // Step 1: 安装 WSL 内核
+    // 组件未落地前，安装内核/导入 Alpine 必然失败，先让用户重启
+    if (rebootRequired) {
+        postLog(L"⚠ 请重启 Windows 后重新运行本工具并再次点击「环境初始化」");
+        PostMessageW(hwnd, WM_USER_ENV_INIT_COMPLETE, 2, 0);
+        delete p;
+        return 0;
+    }
+
+    // Step 1: 安装 WSL（新版安装包已内置足够新的内核）
     if (!status.wsl.isReady()) {
         postLog(L"> 安装 WSL2 内核...");
         std::string err;
-        bool ok = wslsetup::InstallMsi(p->wslMsiPath, &err);
+        bool msiNeedsReboot = false;
+        bool ok = wslsetup::InstallMsi(p->wslMsiPath, &err, &msiNeedsReboot);
         if (ok) {
-            postLog(L"✓ WSL2 内核安装成功");
+            if (msiNeedsReboot) {
+                rebootRequired = true;
+                postLog(L"⟳ WSL2 内核安装成功，需要重启 Windows 后生效");
+            } else {
+                postLog(L"✓ WSL2 内核安装成功");
+            }
         } else {
             postLog((L"✗ WSL2 内核安装失败: " + utils::Utf8ToWString(err)).c_str());
             allOk = false;
+            if (msiNeedsReboot) rebootRequired = true;
         }
     } else {
-        postLog(L"✓ WSL2 内核已就绪，跳过");
+        postLog((L"✓ WSL2 内核已就绪，跳过（" +
+                 utils::Utf8ToWString(status.wsl.detail) + L"）").c_str());
+    }
+
+    if (rebootRequired) {
+        postLog(L"⚠ 请重启 Windows 后重新运行本工具并再次点击「环境初始化」");
+        PostMessageW(hwnd, WM_USER_ENV_INIT_COMPLETE, 2, 0);
+        delete p;
+        return 0;
     }
 
     // Step 2: 导入 Alpine
@@ -1022,13 +1128,16 @@ DWORD WINAPI MainWindow::EnvInitThreadProc(LPVOID param) {
         postLog(L"✓ usbipd 已就绪，跳过");
     }
 
-    // 设置 WSL 默认版本为 2
+    // 设置 WSL 默认版本为 2（首次调用可能触发 VM 冷启动）
     if (allOk) {
         postLog(L"> 设置 WSL 默认版本...");
-        utils::RunProcess(L"wsl.exe", L"--set-default-version 2", "", 30000);
+        auto r = utils::RunProcess(L"wsl.exe", L"--set-default-version 2", "", 60000);
+        if (r.exitCode == (DWORD)-1)
+            utils::RunProcess(L"wsl.exe", L"--set-default-version 2", "", 60000);
     }
 
-    PostMessageW(hwnd, WM_USER_ENV_INIT_COMPLETE, allOk ? 1 : 0, 0);
+    PostMessageW(hwnd, WM_USER_ENV_INIT_COMPLETE,
+                 rebootRequired ? 2 : (allOk ? 1 : 0), 0);
     delete p;
     return 0;
 }

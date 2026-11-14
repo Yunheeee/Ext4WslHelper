@@ -1,9 +1,14 @@
 # 离线安装包下载地址
-# 每个包需要 name 和 url，url 指向可公开下载的 .msi / .tar / .zip 文件
+# CI 逐行解析：先匹配 "- name: <文件名>"，再匹配下一行 "url: <下载地址>"。
+# 文件名必须与 exe 同目录 packages\ 下的实际文件名一致。
+#
+# WSL 安装包要求：WSL >= 2.x，内核 >= 5.10.60.1（usbipd 的最低要求）。
+# 旧版 wsl_update_x64.msi（内核 5.10.16）已废弃，不要再加入本清单；
+# 程序会拒绝使用旧包并校验 wsl --version 中的内核版本。
 
 packages:
-  - name: wsl_update_x64.msi
-    url: https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi
+  - name: wsl.3.0.5.0.x64.msi
+    url: https://github.com/microsoft/WSL/releases/download/3.0.5/wsl.3.0.5.0.x64.msi
 
   - name: Alpine.zip
     url: https://github.com/yuk7/AlpineWSL/releases/download/3.23.3-0/Alpine.zip

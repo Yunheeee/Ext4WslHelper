@@ -121,6 +121,7 @@
     <ClCompile Include="tests\WslManagerTests.cpp" />
     <ClCompile Include="tests\MountManagerTests.cpp" />
     <ClCompile Include="tests\CommandWindowTests.cpp" />
+    <ClCompile Include="tests\EnvironmentServiceTests.cpp" />
     <ClCompile Include="tests\IntegrationTests.cpp" />
   </ItemGroup>
   <ItemGroup>

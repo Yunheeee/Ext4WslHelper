@@ -23,7 +23,7 @@ Once mounted, copy the Windows network path (e.g. `\\wsl.localhost\Alpine\mnt\sd
 | File | Description |
 |------|-------------|
 | `Ext4WslHelper.exe` | Main program — just run it |
-| `packages/wsl_update_x64.msi` | WSL2 Linux kernel update (offline installer) |
+| `packages/wsl.3.0.5.0.x64.msi` | WSL 3.0.5 installer (kernel >= 5.10.60.1) |
 | `packages/usbipd-win_5.3.0_x64.msi` | USB/IP tools for sharing USB devices with WSL2 |
 | `packages/Alpine.zip` | Alpine Linux WSL distro (mount environment) |
 

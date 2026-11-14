@@ -74,6 +74,11 @@ std::wstring Utf8ToWString(const std::string& str);
 // OEM 代码页 → UTF-8（用于 powershell.exe 输出）
 std::string OemToUtf8(const std::string& oemStr);
 
+// 比较点分版本号（如 "5.10.60.1"、"2.0.9.0"）。
+// 返回 <0 表示 lhs < rhs，0 表示相等，>0 表示 lhs > rhs。
+// 非数字后缀会被忽略（如 "5.10.60.1-microsoft-standard-WSL2"）。
+int CompareVersion(const std::string& lhs, const std::string& rhs);
+
 // 替换字符串
 inline std::string Replace(const std::string& s, const std::string& from, const std::string& to) {
     std::string result = s;
