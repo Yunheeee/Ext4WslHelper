@@ -6,17 +6,25 @@ $versionFile = Join-Path $ProjectDir 'VERSION'
 $outFile     = Join-Path $ProjectDir 'src\common\version.h'
 
 $v = (Get-Content $versionFile -Raw).Trim()
-$parts = $v -split '\.'
-$major = [int]$parts[0]
-$minor = if ($parts.Count -gt 1) { [int]$parts[1] } else { 0 }
-$patch = if ($parts.Count -gt 2) { [int]$parts[2] } else { 0 }
-$build = if ($parts.Count -gt 3) { [int]$parts[3] } else { 0 }
+
+# 支持 1.2 / 1.2.3 / 1.2.3.4，以及 -beta.1、-rc.1、+build.5 等后缀。
+# 后缀只影响 VERSION_STRING，不参与 FILEVERSION 的数字解析。
+$versionPattern = '^(?<major>\d+)\.(?<minor>\d+)(?:\.(?<patch>\d+))?(?:\.(?<build>\d+))?(?:[-+].+)?$'
+if (-not ($v -match $versionPattern)) {
+    throw "Invalid VERSION format: '$v' (expected e.g. 1.2.3, 1.2.3.4, 1.2.3-beta.1)"
+}
+
+$major = [int]$Matches['major']
+$minor = [int]$Matches['minor']
+$patch = if ($Matches['patch']) { [int]$Matches['patch'] } else { 0 }
+$build = if ($Matches['build']) { [int]$Matches['build'] } else { 0 }
 
 # FILEVERSION/PRODUCTVERSION 必须是 4 个 16-bit 整数（PE 格式硬性要求）
 # 只有 3 段则第 4 位补 0
 $comma = "$major,$minor,$patch,$build"
 
-# VERSION_STRING 忠实反映 VERSION 文件的精度：1.0.0 → "1.0.0"，1.0.0.0 → "1.0.0.0"
+# VERSION_STRING 忠实反映 VERSION 文件的精度：
+# 1.0.0 → "1.0.0"，1.0.0.0 → "1.0.0.0"，1.0.0-beta.1 → "1.0.0-beta.1"
 $string = $v
 
 @"
