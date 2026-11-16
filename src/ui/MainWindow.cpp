@@ -1173,6 +1173,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
     else logFile += L".log";
     Logger::Instance().EnableFileLogging(logFile);
 
+    if (!wslsetup::IsWindowsVersionSupported()) {
+        DWORD build = wslsetup::GetWindowsBuildNumber();
+        std::wstring msg = L"当前 Windows 版本过低（Build " + std::to_wstring(build) + L"）。\n\n"
+            L"WSL 2.x 安装包要求 Windows 10 2004（Build 19041）或 Windows 11。\n"
+            L"请升级 Windows 后重试。";
+        MessageBoxW(nullptr, msg.c_str(), L"Windows 版本不支持", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+
     if (!IsRunningAsAdmin()) {
         int ret = MessageBoxW(nullptr,
             L"Ext4WslHelper 需要通过 usbipd 操作 USB 设备，需要管理员权限。\n\n"
