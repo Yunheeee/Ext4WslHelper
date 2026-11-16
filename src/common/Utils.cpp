@@ -6,6 +6,116 @@
 
 namespace utils {
 
+namespace {
+
+bool IsValidUtf8Bytes(const std::string& s) {
+    size_t i = 0;
+    while (i < s.size()) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        if (c < 0x80) { i++; continue; }
+        if (c < 0xC2) return false;
+        if (c < 0xE0) {
+            if (i + 1 >= s.size() || (static_cast<unsigned char>(s[i + 1]) & 0xC0) != 0x80) return false;
+            i += 2;
+        } else if (c < 0xF0) {
+            if (i + 2 >= s.size() || (static_cast<unsigned char>(s[i + 1]) & 0xC0) != 0x80 ||
+                (static_cast<unsigned char>(s[i + 2]) & 0xC0) != 0x80) return false;
+            i += 3;
+        } else if (c < 0xF8) {
+            if (i + 3 >= s.size() || (static_cast<unsigned char>(s[i + 1]) & 0xC0) != 0x80 ||
+                (static_cast<unsigned char>(s[i + 2]) & 0xC0) != 0x80 ||
+                (static_cast<unsigned char>(s[i + 3]) & 0xC0) != 0x80) return false;
+            i += 4;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool LooksLikeUtf16Le(const std::string& s) {
+    if (s.size() < 4) return false;
+    if (static_cast<unsigned char>(s[0]) == 0xFF &&
+        static_cast<unsigned char>(s[1]) == 0xFE) return true;
+    size_t oddNull = 0, evenNull = 0;
+    for (size_t i = 0; i + 1 < s.size(); i++) {
+        if (i % 2 == 0) { if (s[i] == '\0') evenNull++; }
+        else { if (s[i] == '\0') oddNull++; }
+    }
+    size_t pairs = s.size() / 2;
+    return oddNull > pairs / 4 && evenNull < pairs / 10;
+}
+
+std::string Utf16LeToUtf8(const std::string& s) {
+    size_t offset = 0;
+    size_t len = s.size();
+    if (len >= 2 && static_cast<unsigned char>(s[0]) == 0xFF &&
+        static_cast<unsigned char>(s[1]) == 0xFE) {
+        offset = 2;
+        len -= 2;
+    }
+    len &= ~size_t(1); // 只处理完整 UTF-16 单元
+    if (len < 2) return {};
+    int wideLen = static_cast<int>(len / 2);
+    int utf8Len = WideCharToMultiByte(CP_UTF8, 0,
+        reinterpret_cast<LPCWCH>(s.data() + offset), wideLen,
+        nullptr, 0, nullptr, nullptr);
+    if (utf8Len <= 0) return {};
+    std::string utf8(utf8Len, '\0');
+    WideCharToMultiByte(CP_UTF8, 0,
+        reinterpret_cast<LPCWCH>(s.data() + offset), wideLen,
+        utf8.data(), utf8Len, nullptr, nullptr);
+    return utf8;
+}
+
+// 把原始管道数据转换成可读的单行日志预览（UTF-16LE → UTF-8，OEM 兜底）
+std::string DecodeForLog(const std::string& raw) {
+    std::string text = LooksLikeUtf16Le(raw) ? Utf16LeToUtf8(raw) : raw;
+    if (!text.empty() && !IsValidUtf8Bytes(text)) {
+        std::string oem = OemToUtf8(text);
+        if (!oem.empty()) text = std::move(oem);
+    }
+
+    // 折叠换行/制表，连续空白只保留一个
+    std::string clean;
+    clean.reserve(text.size());
+    bool prevSpace = false;
+    for (unsigned char c : text) {
+        if (c == '\r' || c == '\n' || c == '\t') {
+            if (!prevSpace) { clean += ' '; prevSpace = true; }
+        } else if (c >= 0x20 || c >= 0x80) {
+            clean += static_cast<char>(c);
+            prevSpace = (c == ' ');
+        }
+    }
+    const size_t kMaxPreview = 400;
+    if (clean.size() > kMaxPreview) {
+        clean.resize(kMaxPreview);
+        clean += "...";
+    }
+    return clean;
+}
+
+std::string DescribeForLog(const std::string& data, const char* label) {
+    if (data.empty()) return {};
+    return std::string(label) + "=" + std::to_string(data.size()) +
+           "bytes \"" + DecodeForLog(data) + "\" ";
+}
+
+int ReadVersionComponent(const std::string& s, size_t& pos) {
+    while (pos < s.size() && !(s[pos] >= '0' && s[pos] <= '9')) pos++;
+    int value = 0;
+    while (pos < s.size() && s[pos] >= '0' && s[pos] <= '9') {
+        value = value * 10 + (s[pos] - '0');
+        pos++;
+    }
+    while (pos < s.size() && s[pos] != '.') pos++;
+    if (pos < s.size() && s[pos] == '.') pos++;
+    return value;
+}
+
+} // namespace
+
 std::string WStringToUtf8(const std::wstring& wstr) {
     if (wstr.empty()) return {};
     int len = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(),
@@ -41,6 +151,22 @@ std::string OemToUtf8(const std::string& oemStr) {
     WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(),
                         result.data(), len8, nullptr, nullptr);
     return result;
+}
+
+int CompareVersion(const std::string& lhs, const std::string& rhs) {
+    size_t pa = 0, pb = 0;
+    // 最多比较 8 段，足够覆盖内核/工具版本号
+    for (int i = 0; i < 8; i++) {
+        bool aDone = (pa >= lhs.size());
+        bool bDone = (pb >= rhs.size());
+        if (aDone && bDone) break;
+
+        int a = aDone ? 0 : ReadVersionComponent(lhs, pa);
+        int b = bDone ? 0 : ReadVersionComponent(rhs, pb);
+        if (a < b) return -1;
+        if (a > b) return 1;
+    }
+    return 0;
 }
 
 ProcessResult RunProcess(const std::wstring& executable,
@@ -130,30 +256,14 @@ ProcessResult RunProcess(const std::wstring& executable,
     }
 
     // 编码检测与统一转换：UTF-16LE → OEM → UTF-8
-    // [RunProc 原始输出日志 — 编码转换前]
+    // [RunProc 原始输出日志 — 按 UTF-16LE/OEM 正确解码后记录，避免不可读的 hex]
     {
         DWORD elapsed = GetTickCount() - startTick;
-        std::string elapsedStr = std::to_string(elapsed);
-        std::string rawHex;
-        auto AppendHex = [&](const std::string& s, const char* label) {
-            if (s.empty()) return;
-            rawHex += std::string(label) + "=" + std::to_string(s.size()) + "bytes";
-            if (s.size() > 0) {
-                rawHex += " hex(";
-                for (size_t i = 0; i < s.size() && i < 96; i++) {
-                    char buf[4]; sprintf_s(buf, "%02x ", (unsigned char)s[i]);
-                    rawHex += buf;
-                }
-                if (s.size() > 96) rawHex += "...";
-                rawHex += ")";
-            }
-            rawHex += " ";
-        };
-        AppendHex(result.stdOut, "stdout");
-        AppendHex(result.stdErr, "stderr");
+        std::string preview = DescribeForLog(result.stdOut, "stdout") +
+                              DescribeForLog(result.stdErr, "stderr");
         Logger::Instance().Info("[RunProc] " + WStringToUtf8(cmdLine) +
                                 " exit=" + std::to_string(result.exitCode) +
-                                " elapsed=" + elapsedStr + "ms " + rawHex);
+                                " elapsed=" + std::to_string(elapsed) + "ms " + preview);
     }
     auto IsValidUtf8 = [](const std::string& s) -> bool {
         size_t i = 0;
@@ -552,29 +662,14 @@ ProcessResult RunProcessStreaming(const std::wstring& executable,
     result.stdOut = std::move(rawOut);
     result.stdErr = std::move(rawErr);
 
-    // [RunProcStream 原始输出日志]
+    // [RunProcStream 输出日志 — 已按 UTF-16LE/OEM 正确解码]
     {
         DWORD elapsed = GetTickCount() - startTick;
-        std::string rawHex;
-        auto AppendHex = [&](const std::string& s, const char* label) {
-            if (s.empty()) return;
-            rawHex += std::string(label) + "=" + std::to_string(s.size()) + "bytes";
-            if (s.size() > 0) {
-                rawHex += " hex(";
-                for (size_t i = 0; i < s.size() && i < 96; i++) {
-                    char buf[4]; sprintf_s(buf, "%02x ", (unsigned char)s[i]);
-                    rawHex += buf;
-                }
-                if (s.size() > 96) rawHex += "...";
-                rawHex += ")";
-            }
-            rawHex += " ";
-        };
-        AppendHex(result.stdOut, "stdout");
-        AppendHex(result.stdErr, "stderr");
+        std::string preview = DescribeForLog(result.stdOut, "stdout") +
+                              DescribeForLog(result.stdErr, "stderr");
         Logger::Instance().Info("[RunProcStream] " + WStringToUtf8(cmdLine) +
                                 " exit=" + std::to_string(result.exitCode) +
-                                " elapsed=" + std::to_string(elapsed) + "ms " + rawHex);
+                                " elapsed=" + std::to_string(elapsed) + "ms " + preview);
     }
 
     CloseHandle(hStdOutRd);

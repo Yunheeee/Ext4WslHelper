@@ -107,6 +107,27 @@ public:
         std::string result = utils::OemToUtf8("hello");
         Assert::AreEqual("hello", result.c_str());
     }
+
+    TEST_METHOD(CompareVersion_Less) {
+        Assert::IsTrue(utils::CompareVersion("5.10.16", "5.10.60.1") < 0);
+    }
+
+    TEST_METHOD(CompareVersion_Greater) {
+        Assert::IsTrue(utils::CompareVersion("6.6.87.2-1", "5.10.60.1") > 0);
+    }
+
+    TEST_METHOD(CompareVersion_EqualWithDifferentLength) {
+        Assert::AreEqual(0, utils::CompareVersion("5.10.60", "5.10.60.0"));
+    }
+
+    TEST_METHOD(CompareVersion_ExactMinimum) {
+        Assert::AreEqual(0, utils::CompareVersion("5.10.60.1", "5.10.60.1"));
+    }
+
+    TEST_METHOD(CompareVersion_NonNumericSuffixIgnored) {
+        Assert::IsTrue(utils::CompareVersion(
+            "5.15.133.1-microsoft-standard-WSL2", "5.10.60.1") > 0);
+    }
 };
 
 TEST_CLASS(ErrorCodeTests) {

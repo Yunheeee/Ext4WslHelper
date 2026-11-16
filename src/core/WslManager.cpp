@@ -60,8 +60,8 @@ static std::string RunWslListDirect() {
         return {};
     }
 
-    // 等待最多 15 秒
-    DWORD waitResult = WaitForSingleObject(pi.hProcess, 15000);
+    // 首次调用可能触发 WSL VM 冷启动，实测可超过 10 秒
+    DWORD waitResult = WaitForSingleObject(pi.hProcess, 60000);
     if (waitResult == WAIT_TIMEOUT) {
         TerminateProcess(pi.hProcess, 1);
         CloseHandle(pi.hThread);
@@ -108,8 +108,12 @@ std::vector<WslDistribution> WslManager::ListDistributions() {
     std::vector<WslDistribution> distros;
 
     // 主路径：通过 executor（外部命令检测 → RunProcess → OEM→UTF-8，且会转发到 debug 窗口）
+    // 首次调用（VM 冷启动）可能超过 10s，给 60s 并在超时后重试一次
     std::string output;
-    auto result = executor_->Execute("wsl --list --verbose", "", 15000);
+    auto result = executor_->Execute("wsl --list --verbose", "", 60000);
+    if (result.exitCode == (DWORD)-1) {
+        result = executor_->Execute("wsl --list --verbose", "", 60000);
+    }
     if (result.exitCode == 0 && !result.stdOut.empty()) {
         output = result.stdOut;
     } else {
@@ -209,7 +213,7 @@ std::string WslManager::DetectBlockDevice(const std::string& previousDisks) {
     // 输出格式: major minor #blocks name
     //              8    0  62512344 sda
     //              8    1  62512344 sda1
-    auto partsResult = executor_->Execute(wslPrefix + "cat /proc/partitions", "", 10000);
+    auto partsResult = executor_->Execute(wslPrefix + "cat /proc/partitions", "", 30000);
     if (partsResult.exitCode != 0) {
         Logger::Instance().Error("[WslManager] cat /proc/partitions failed");
         return "";
@@ -249,10 +253,10 @@ bool WslManager::EnsureUsbStorageModule() {
     std::string wslPrefix = distro_.empty() ? "" : "wsl -d " + distro_ + " -- ";
 
     // 先确保 WSL 内可执行命令（先跑一个简单命令热身，避免 WSL 启动竞争）
-    executor_->Execute(wslPrefix + "true", "", 5000);
+    executor_->Execute(wslPrefix + "true", "", 60000);
 
     // 第一步：检查 usb_storage 是否已加载
-    auto check = executor_->Execute(wslPrefix + "lsmod | grep usb_storage", "", 10000);
+    auto check = executor_->Execute(wslPrefix + "lsmod | grep usb_storage", "", 30000);
     if (check.exitCode == 0 && !check.stdOut.empty()) {
         Logger::Instance().Info("[WslManager] usb_storage module already loaded");
         return true;
@@ -261,15 +265,15 @@ bool WslManager::EnsureUsbStorageModule() {
     Logger::Instance().Info("[WslManager] usb_storage not loaded, loading with modprobe...");
 
     // 第二步：尝试 modprobe，捕获完整输出
-    auto mod = executor_->Execute(wslPrefix + "modprobe usb-storage 2>&1", "", 10000);
+    auto mod = executor_->Execute(wslPrefix + "modprobe usb-storage 2>&1", "", 30000);
     Logger::Instance().Info("[WslManager] modprobe exit=" + std::to_string(mod.exitCode) +
                             " out=[" + mod.stdOut + "] err=[" + mod.stdErr + "]");
 
     if (mod.exitCode != 0) {
         // modprobe 失败，尝试 depmod -a 重建依赖再试
         Logger::Instance().Info("[WslManager] modprobe failed, trying depmod...");
-        executor_->Execute(wslPrefix + "depmod -a 2>&1", "", 15000);
-        auto mod2 = executor_->Execute(wslPrefix + "modprobe usb-storage 2>&1", "", 10000);
+        executor_->Execute(wslPrefix + "depmod -a 2>&1", "", 60000);
+        auto mod2 = executor_->Execute(wslPrefix + "modprobe usb-storage 2>&1", "", 30000);
         Logger::Instance().Info("[WslManager] modprobe (after depmod) exit=" +
                                 std::to_string(mod2.exitCode) +
                                 " out=[" + mod2.stdOut + "] err=[" + mod2.stdErr + "]");
@@ -282,7 +286,7 @@ bool WslManager::EnsureUsbStorageModule() {
     Sleep(500); // 等待模块初始化
 
     // 第三步：lsmod 确认
-    auto verify = executor_->Execute(wslPrefix + "lsmod | grep usb_storage", "", 10000);
+    auto verify = executor_->Execute(wslPrefix + "lsmod | grep usb_storage", "", 30000);
     bool nowLoaded = (verify.exitCode == 0 && !verify.stdOut.empty());
     if (nowLoaded) {
         Logger::Instance().Info("[WslManager] usb_storage loaded (confirmed via lsmod)");
@@ -295,7 +299,7 @@ bool WslManager::EnsureUsbStorageModule() {
 
 std::string WslManager::GetDiskList() {
     std::string wslPrefix = distro_.empty() ? "" : "wsl -d " + distro_ + " -- ";
-    auto result = executor_->Execute(wslPrefix + "cat /proc/partitions", "", 10000);
+    auto result = executor_->Execute(wslPrefix + "cat /proc/partitions", "", 30000);
     if (result.exitCode == 0) {
         return result.stdOut;
     }
@@ -315,7 +319,7 @@ std::string WslManager::MountExt4(const std::string& device,
     // 如需 sudo，先验证密码
     if (needSudo) {
         std::string testCmd = wslPrefix + "sudo -S echo ok";
-        auto testResult = executor_->Execute(testCmd, sudoPassword + "\n", 10000);
+        auto testResult = executor_->Execute(testCmd, sudoPassword + "\n", 30000);
         if (testResult.exitCode != 0) {
             std::string err = testResult.stdOut + " " + testResult.stdErr;
             if (err.find("incorrect password") != std::string::npos ||
@@ -333,7 +337,7 @@ std::string WslManager::MountExt4(const std::string& device,
     std::string mkdirCmd = needSudo
         ? wslPrefix + "sudo -S mkdir -p " + mountPoint
         : wslPrefix + "mkdir -p " + mountPoint;
-    auto mkdirResult = executor_->Execute(mkdirCmd, needSudo ? sudoPassword + "\n" : "", 15000);
+    auto mkdirResult = executor_->Execute(mkdirCmd, needSudo ? sudoPassword + "\n" : "", 30000);
     if (mkdirResult.exitCode != 0) {
         std::string errMsg = "创建挂载点失败: " + mkdirResult.stdErr;
         Logger::Instance().Error("[WslManager] " + errMsg);
@@ -352,7 +356,7 @@ std::string WslManager::MountExt4(const std::string& device,
                 ? wslPrefix + "mount -t ext4 /dev/" + device + " " + mountPoint
                 : wslPrefix + "mount -t ext4 " + flags + " /dev/" + device + " " + mountPoint;
         }
-        auto r = executor_->Execute(cmd, needSudo ? sudoPassword + "\n" : "", 15000);
+        auto r = executor_->Execute(cmd, needSudo ? sudoPassword + "\n" : "", 30000);
         return r.exitCode == 0 ? "" : r.stdOut + " " + r.stdErr;
     };
 
@@ -374,7 +378,7 @@ std::string WslManager::MountExt4(const std::string& device,
 
 bool WslManager::IsMounted(const std::string& mountPoint) {
     std::string wslPrefix = distro_.empty() ? "" : "wsl -d " + distro_ + " -- ";
-    auto r = executor_->Execute(wslPrefix + "mountpoint -q " + mountPoint, "", 5000);
+    auto r = executor_->Execute(wslPrefix + "mountpoint -q " + mountPoint, "", 15000);
     return (r.exitCode == 0);
 }
 
@@ -389,7 +393,7 @@ bool WslManager::Unmount(const std::string& mountPoint,
 
     // 循环卸载，每次去掉一层挂载（支持多次挂载场景）
     for (int i = 0; i < 10; i++) {
-        auto result = executor_->Execute(cmd, needSudo ? sudoPassword + "\n" : "", 15000);
+        auto result = executor_->Execute(cmd, needSudo ? sudoPassword + "\n" : "", 30000);
 
         if (result.exitCode == 0) {
             Logger::Instance().Info("[WslManager] Unmounted one layer at " + mountPoint);
@@ -409,7 +413,7 @@ bool WslManager::Unmount(const std::string& mountPoint,
         std::string lazyCmd = needSudo
             ? wslPrefix + "sudo -S umount -l " + mountPoint
             : wslPrefix + "umount -l " + mountPoint;
-        auto lazyResult = executor_->Execute(lazyCmd, needSudo ? sudoPassword + "\n" : "", 15000);
+        auto lazyResult = executor_->Execute(lazyCmd, needSudo ? sudoPassword + "\n" : "", 30000);
         if (lazyResult.exitCode != 0) {
             Logger::Instance().Error("[WslManager] Unmount failed: " +
                                      result.stdOut + " " + result.stdErr);

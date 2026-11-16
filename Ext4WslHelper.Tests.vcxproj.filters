@@ -42,6 +42,9 @@
     <ClCompile Include="tests\MountManagerTests.cpp">
       <Filter>tests</Filter>
     </ClCompile>
+    <ClCompile Include="tests\EnvironmentServiceTests.cpp">
+      <Filter>tests</Filter>
+    </ClCompile>
     <ClCompile Include="src\core\UsbipdManager.cpp">
       <Filter>core</Filter>
     </ClCompile>
