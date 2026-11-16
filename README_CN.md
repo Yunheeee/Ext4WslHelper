@@ -20,7 +20,7 @@ packages/ 目录下为所有依赖的安装包，可离线使用。
 | 文件 | 说明 |
 |------|------|
 | Ext4WslHelper.exe| 🚀 主程序 — 直接运行，自动处理所有依赖 |
-| packages/wsl.3.0.5.0.x64.msi |	WSL 3.0.5 安装包（内核 ≥ 5.10.60.1）|
+| packages/wsl.2.2.1.0.x64.msi |	WSL 2.2.1 安装包（内核 5.15.150.1-2，≥ 5.10.60.1）|
 | packages/usbipd-win_5.3.0_x64.msi | USB/IP 工具，用于 WSL2 共享 USB 设备 |
 | packages/Alpine.zip |	Alpine Linux WSL 发行版（挂载环境）|
 
@@ -38,7 +38,7 @@ SD 卡 (EXT4)  ──usbipd──▶  WSL2 虚拟机  ──mount──▶  \\ws
 
 | 组件 | 说明 |
 |------|------|
-| Windows 10 1903+ (x64) / 2004+ (ARM64) | 内置 WSL2 支持 |
+| Windows 10 2004+ (x64/ARM64) | WSL 2.x 安装包要求 |
 | 管理员权限 | usbipd 设备绑定需要 |
 
 程序启动后自动检测环境状态，缺少的组件可通过 **一键初始化** 离线安装。

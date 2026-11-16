@@ -23,7 +23,7 @@ Once mounted, copy the Windows network path (e.g. `\\wsl.localhost\Alpine\mnt\sd
 | File | Description |
 |------|-------------|
 | `Ext4WslHelper.exe` | Main program — just run it |
-| `packages/wsl.3.0.5.0.x64.msi` | WSL 3.0.5 installer (kernel >= 5.10.60.1) |
+| `packages/wsl.2.2.1.0.x64.msi` | WSL 2.2.1 installer (kernel 5.15.150.1-2, >= 5.10.60.1) |
 | `packages/usbipd-win_5.3.0_x64.msi` | USB/IP tools for sharing USB devices with WSL2 |
 | `packages/Alpine.zip` | Alpine Linux WSL distro (mount environment) |
 
@@ -41,7 +41,7 @@ SD card (EXT4)  ──usbipd──▶  WSL2 VM  ──mount──▶  \\wsl.loca
 
 | Component | Notes |
 |-----------|-------|
-| Windows 10 1903+ (x64) / 2004+ (ARM64) | Built-in WSL2 support |
+| Windows 10 2004+ (x64/ARM64) | Required by the WSL 2.x installer |
 | Administrator privileges | Required for usbipd device binding |
 
 The program auto-detects your environment status on startup. Missing components can be installed offline with one click.

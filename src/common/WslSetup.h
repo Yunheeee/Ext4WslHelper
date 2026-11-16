@@ -7,7 +7,7 @@ namespace wslsetup {
 
 // Step 0: Windows 版本检查
 DWORD GetWindowsBuildNumber();
-bool IsWindowsVersionSupported();  // x64≥18362, ARM64≥19041
+bool IsWindowsVersionSupported();  // x64/ARM64 ≥19041（WSL 2.x MSI 要求）
 
 // Step 1: Windows 可选功能
 bool IsWindowsFeatureEnabled(const std::wstring& featureName);
@@ -41,8 +41,9 @@ bool InstallUsbipdMsi(const std::wstring& msiPath, std::string* outError = nullp
 std::wstring FindPackageFile(const std::wstring& exeDir, const std::wstring& pattern);
 
 // 常量
-constexpr DWORD MIN_BUILD_X64   = 18362;   // 1903
-constexpr DWORD MIN_BUILD_ARM64 = 19041;    // 2004
+// WSL 2.x MSI 官方最低 Windows 10 2004（Build 19041）/ Windows 11
+constexpr DWORD MIN_BUILD_X64   = 19041;   // 2004
+constexpr DWORD MIN_BUILD_ARM64 = 19041;   // 2004
 
 // usbipd 要求的最低 WSL2 内核版本
 constexpr const char* WSL_MIN_KERNEL_VERSION = "5.10.60.1";

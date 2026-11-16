@@ -7,11 +7,11 @@
 | 组件 | 用途 | 离线包格式 |
 |---|---|---|
 | Windows 可选功能（WSL + 虚拟机平台） | 基础虚拟化支持 | 系统内置（dism 启用） |
-| WSL 安装包（含内核） | WSL ≥ 2.x，内核 ≥ 5.10.60.1 | `wsl.3.0.5.0.x64.msi` |
+| WSL 安装包（含内核） | WSL ≥ 2.x，内核 ≥ 5.10.60.1 | `wsl.2.2.1.0.x64.msi` |
 | Alpine WSL 发行版 | EXT4 挂载操作环境 | `Alpine.tar` 或 `Alpine.zip`（自动解压） |
 | usbipd-win | USB 设备重定向到 WSL | `usbipd-win_*.msi` |
 
-离线安装包放置位置：exe 同目录，工具通过 `wslsetup::FindPackageFile()` 自动搜索。
+离线安装包放置位置：exe 同目录，工具通过 `wslsetup::FindWslPackage()` / `wslsetup::FindPackageFile()` 自动搜索。
 
 ---
 
@@ -24,8 +24,7 @@
   │
   ├─ Step 0: Windows 版本检查
   │      RtlGetVersion → dwBuildNumber
-  │      x64 < 18362 → ❌ 提示不支持，退出
-  │      ARM64 < 19041 → ❌ 提示不支持，退出
+  │      x64/ARM64 < 19041 → ❌ 提示不支持，退出
   │
   ├─ Step 1: 环境检测（异步，后台线程，不阻塞 UI）
   │      EnvironmentService::CheckAll() → EnvironmentStatus
@@ -46,7 +45,7 @@
   │        ├── FindPackageFile(exeDir, "usbipd*.msi")
   │        │
   │        ├── 安装 WSL 内核 MSI:
-  │        │    msiexec /i "wsl.3.0.5.0.x64.msi" /quiet /norestart
+  │        │    msiexec /i "wsl.2.2.1.0.x64.msi" /quiet /norestart
   │        │    wsl --set-default-version 2
   │        │
   │        ├── 导入 Alpine 发行版:
@@ -66,7 +65,7 @@
 
 | 操作 | 来源 | 目标 |
 |---|---|---|
-| wsl.3.0.5.0.x64.msi 安装 | exe 同目录 | 系统级别 |
+| wsl.2.2.1.0.x64.msi 安装 | exe 同目录 | 系统级别 |
 | Alpine.tar(.zip) 导入 | exe 同目录 → 解压（zip）→ `wsl --import` | `%LOCALAPPDATA%\Alpine` |
 | usbipd-win_*.msi 安装 | exe 同目录 | 系统级别 (`%PROGRAMFILES%\usbipd-win`) |
 
@@ -74,7 +73,7 @@
 
 | 架构 | 最低 Build | 对应版本 |
 |------|-----------|----------|
-| x64 | 18362 | 1903 |
+| x64 | 19041 | 2004 |
 | ARM64 | 19041 | 2004 |
 
 ## 关键代码结构
@@ -107,7 +106,7 @@ bool InstallUsbipdMsi(const std::wstring& msiPath, std::string* outError = nullp
 std::wstring FindPackageFile(const std::wstring& exeDir, const std::wstring& pattern);
 
 // 常量
-constexpr DWORD MIN_BUILD_X64   = 18362;   // 1903
+constexpr DWORD MIN_BUILD_X64   = 19041;   // 2004
 constexpr DWORD MIN_BUILD_ARM64 = 19041;   // 2004
 
 }

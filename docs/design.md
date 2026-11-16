@@ -438,13 +438,13 @@ MainWindow::OnEnvInit()
         ▼
     EnvInitThreadProc()
         │
-        ├── wslsetup::FindPackageFile(exeDir, "wsl*.msi")
+        ├── wslsetup::FindWslPackage(exeDir)
         ├── wslsetup::FindPackageFile(exeDir, "alpine*.tar*")
         ├── wslsetup::FindPackageFile(exeDir, "alpine*.zip")
         ├── wslsetup::FindPackageFile(exeDir, "usbipd*.msi")
         │
         ├── 安装 WSL MSI: wslsetup::InstallMsi(wslMsiPath)
-        │    └── msiexec /i "wsl_update_x64.msi" /quiet /norestart
+        │    └── msiexec /i "wsl.2.2.1.0.x64.msi" /quiet /norestart
         │
         ├── 导入 Alpine:  wslsetup::ImportAlpineTar(alpinePath)
         │    ├── 若为 .zip 则先解压
@@ -665,7 +665,7 @@ Ubuntu:
 ```
 在线下载流程（旧）:                 离线安装流程（当前）:
   download URL                       exe 同目录放置:
-    → wsl_update_x64.msi               • wsl_update_x64.msi
+    → wsl_update_x64.msi               • wsl.2.2.1.0.x64.msi
     → Ubuntu.appx                      • Alpine.tar / .zip
     → 网络慢/失败风险大                  • usbipd-win_x64.msi
                                        → FindPackageFile 自动查找
