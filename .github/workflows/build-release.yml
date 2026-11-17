@@ -34,8 +34,13 @@ jobs:
         id: set-version
         shell: pwsh
         run: |
+          $versionPattern = '^\d+\.\d+(?:\.\d+)?(?:\.\d+)?(?:[-+].+)?$'
           $ver = '${{ github.event.inputs.version }}'
           if ($ver) {
+            if ($ver -notmatch $versionPattern) {
+              Write-Error "Invalid version '$ver' (expected e.g. 1.2.3, 1.2.3.4, 1.2.3-beta.1)"
+              exit 1
+            }
             Write-Host "Setting version to: $ver"
             Set-Content -Path VERSION -Value $ver -NoNewline
           } else {
@@ -46,6 +51,10 @@ jobs:
           $ref = '${{ github.ref }}'
           if ($ref -match '^refs/tags/v(.+)$') {
             $tagVer = $matches[1]
+            if ($tagVer -notmatch $versionPattern) {
+              Write-Error "Invalid release tag '$tagVer' (expected e.g. v1.2.3, v1.2.3.4, v1.2.3-beta.1)"
+              exit 1
+            }
             Write-Host "Tag-triggered build, overriding version to: $tagVer"
             Set-Content -Path VERSION -Value $tagVer -NoNewline
           }
@@ -135,7 +144,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'pull_request'
 
     steps:
-      - name: Checkout for RELEASE.md
+      - name: Checkout for CHANGELOG.md
         uses: actions/checkout@v4
 
       - name: Download artifact
@@ -156,5 +165,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          body_path: RELEASE.md
+          body_path: CHANGELOG.md
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          fail_on_unmatched_files: true
           files: Ext4WslHelper-v*.zip
