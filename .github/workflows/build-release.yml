@@ -144,7 +144,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'pull_request'
 
     steps:
-      - name: Checkout for RELEASE.md
+      - name: Checkout for CHANGELOG.md
         uses: actions/checkout@v4
 
       - name: Download artifact
@@ -165,7 +165,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          body_path: RELEASE.md
+          body_path: CHANGELOG.md
           prerelease: ${{ contains(github.ref_name, '-') }}
           fail_on_unmatched_files: true
           files: Ext4WslHelper-v*.zip
